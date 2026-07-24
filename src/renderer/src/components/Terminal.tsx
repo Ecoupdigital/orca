@@ -103,6 +103,7 @@ import { appendUniqueOpenFileIds } from './terminal/unsaved-close-queue'
 import { setWindowCloseRequestHandler } from './window-close-request-coordinator'
 import CodexRestartChip from './CodexRestartChip'
 import PaneExplorerColumn from './workspace-split/PaneExplorerColumn'
+import { promotePaneFocusContext } from '@/lib/pane-focus-context'
 import {
   findActivityTerminalPortal,
   useActivityTerminalPortals,
@@ -2532,10 +2533,7 @@ const WorktreeSplitSurface = React.memo(function WorktreeSplitSurface({
     ) {
       return
     }
-    const state = useAppStore.getState()
-    if (state.activeWorktreeId !== worktreeId) {
-      state.setActiveWorktree(worktreeId)
-    }
+    promotePaneFocusContext(worktreeId)
   }
 
   return (
