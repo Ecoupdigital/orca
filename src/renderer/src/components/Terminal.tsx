@@ -102,6 +102,7 @@ import { isMainTerminalSideEffectAuthorityForPty } from './terminal-pane/termina
 import { appendUniqueOpenFileIds } from './terminal/unsaved-close-queue'
 import { setWindowCloseRequestHandler } from './window-close-request-coordinator'
 import CodexRestartChip from './CodexRestartChip'
+import PaneExplorerColumn from './workspace-split/PaneExplorerColumn'
 import {
   findActivityTerminalPortal,
   useActivityTerminalPortals,
@@ -2567,6 +2568,11 @@ const WorktreeSplitSurface = React.memo(function WorktreeSplitSurface({
       inert={!isVisible}
       aria-hidden={!isVisible}
     >
+      {/* Why: gated on workspacePaneControls (non-null only when the split is
+          visible, which itself implies the experimentalSideBySideWorkspaces
+          flag is on) — with the flag off or outside a split this never
+          renders and never mounts a FileTree/watcher (EDGE-02). */}
+      {isVisible && workspacePaneControls ? <PaneExplorerColumn worktreeId={worktreeId} /> : null}
       <CodexRestartChip isVisible={isVisible} worktreeId={worktreeId} />
       <TabGroupSplitLayout
         layout={layout}

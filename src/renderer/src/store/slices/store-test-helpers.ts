@@ -49,6 +49,7 @@ import { createOrcaProfilesSlice } from './orca-profiles'
 import { createNewIssueDraftSlice } from './new-issue-draft'
 import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createWorkspaceSplitViewSlice } from './workspace-split-view'
+import { createPaneExplorerSlice } from './pane-explorer'
 import { translate } from '@/i18n/i18n'
 
 export const TEST_REPO = {
@@ -101,7 +102,8 @@ export function createTestStore() {
     ...createOrcaProfilesSlice(...a),
     ...createNewIssueDraftSlice(...a),
     ...createRemoteServerUpdatesSlice(...a),
-    ...createWorkspaceSplitViewSlice(...a)
+    ...createWorkspaceSplitViewSlice(...a),
+    ...createPaneExplorerSlice(...a)
   }))
 }
 

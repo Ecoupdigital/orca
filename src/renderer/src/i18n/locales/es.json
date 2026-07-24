@@ -13825,5 +13825,11 @@
       "certificateChallengeUnavailable": "This certificate request is no longer available. Retry the page to request a new one.",
       "certificateProceedFailed": "Orca could not approve this certificate request. Retry the page and try again."
     }
+  },
+  "workspaceSplit": {
+    "paneExplorer": {
+      "expand": "Expand explorer",
+      "collapse": "Collapse explorer"
+    }
   }
 }
