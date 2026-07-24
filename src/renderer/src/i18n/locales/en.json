@@ -13825,5 +13825,11 @@
     "sidebar": {
       "label": "Agent Dashboard"
     }
+  },
+  "workspaceSplit": {
+    "paneExplorer": {
+      "expand": "Expand explorer",
+      "collapse": "Collapse explorer"
+    }
   }
 }
