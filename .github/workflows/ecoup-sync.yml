@@ -48,19 +48,39 @@ jobs:
           set -euo pipefail
           UPSTREAM_SHA=$(git rev-parse upstream/main)
           FORK_SHA=$(git rev-parse origin/main)
+          PUSH_REJECTED="false"
           if [ "$SIMULATE" != "true" ] && git merge-base --is-ancestor origin/main upstream/main; then
             if [ "$UPSTREAM_SHA" = "$FORK_SHA" ]; then
               echo "main ja espelha o upstream ($FORK_SHA)"
               exit 0
             fi
-            git push origin upstream/main:refs/heads/main
-            echo "main avancou fast-forward: $FORK_SHA -> $UPSTREAM_SHA"
-            exit 0
+            if git push origin upstream/main:refs/heads/main; then
+              echo "main avancou fast-forward: $FORK_SHA -> $UPSTREAM_SHA"
+              exit 0
+            fi
+            PUSH_REJECTED="true"
+            echo "git push rejeitado pelo GitHub mesmo com fast-forward valido (ver causa provavel abaixo); seguindo para abertura de issue."
           fi
-          echo "Fast-forward impossivel (ou simulacao ativa). Force push NUNCA sera usado."
+          echo "Fast-forward impossivel (ou simulacao ativa, ou push rejeitado). Force push NUNCA sera usado."
           OPEN_COUNT=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "[ecoup-sync] in:title" --json number --jq 'length')
           if [ "$OPEN_COUNT" = "0" ]; then
-            BODY=$(cat <<'ISSUE_EOF'
+            if [ "$PUSH_REJECTED" = "true" ]; then
+              BODY=$(cat <<'ISSUE_EOF'
+          O sync diário detectou que o branch main do fork não pode avançar por fast-forward até o stablyai/orca.
+
+          Causa provável: o GitHub bloqueou o push porque ele atualiza arquivo(s) dentro de `.github/workflows/` e o GITHUB_TOKEN (token de GitHub App usado pelo Actions) nunca recebe permissão para tocar esses arquivos, em nenhuma configuração do bloco de escopos do workflow (restrição fixa da plataforma, não é bug de configuração).
+
+          Como resolver (manual, com uma conta que tenha o escopo `workflow`, nunca com push forçado):
+          1. No seu clone local: git fetch origin && git fetch https://github.com/stablyai/orca.git main
+          2. Conferir que é fast-forward puro: git merge-base --is-ancestor origin/main FETCH_HEAD && echo "fast-forward valido"
+          3. Empurrar manualmente com uma credencial pessoal (com escopo `workflow`, não o GITHUB_TOKEN): git push origin FETCH_HEAD:refs/heads/main
+          4. Se o passo 2 falhar (main não é mais ancestral do upstream), main recebeu commits próprios por engano ou o upstream reescreveu histórico: investigar com `git log --oneline origin/main --not FETCH_HEAD` antes de qualquer ação.
+
+          Issue aberta automaticamente pelo workflow ecoup-sync.
+          ISSUE_EOF
+              )
+            else
+              BODY=$(cat <<'ISSUE_EOF'
           O sync diário detectou que o branch main do fork não pode avançar por fast-forward até o stablyai/orca.
 
           Causas prováveis: main recebeu commits próprios (main deve ser espelho puro, sem commits do fork) ou o upstream reescreveu histórico.
@@ -73,7 +93,8 @@ jobs:
 
           Issue aberta automaticamente pelo workflow ecoup-sync.
           ISSUE_EOF
-            )
+              )
+            fi
             gh issue create --repo "$GITHUB_REPOSITORY" \
               --title "[ecoup-sync] main não avança fast-forward até o upstream" \
               --body "$BODY"
@@ -114,15 +135,38 @@ jobs:
             echo "ecoup ja contem main; nada a fazer"
             exit 0
           fi
+          PUSH_REJECTED="false"
           if git merge --no-edit origin/main; then
-            git push origin HEAD:refs/heads/ecoup
-            echo "merge de main em ecoup concluido sem conflito"
-            exit 0
+            if git push origin HEAD:refs/heads/ecoup; then
+              echo "merge de main em ecoup concluido sem conflito"
+              exit 0
+            fi
+            PUSH_REJECTED="true"
+            echo "git push rejeitado pelo GitHub mesmo com merge local sem conflito (ver causa provavel no PR); seguindo para abertura de PR."
+            git reset --hard origin/ecoup
+          else
+            git merge --abort
           fi
-          git merge --abort
           OPEN_PRS=$(gh pr list --repo "$GITHUB_REPOSITORY" --base ecoup --head main --state open --json number --jq 'length')
           if [ "$OPEN_PRS" = "0" ]; then
-            BODY=$(cat <<'PR_EOF'
+            if [ "$PUSH_REJECTED" = "true" ]; then
+              BODY=$(cat <<'PR_EOF'
+          O merge diário automático de main em ecoup foi concluído localmente sem conflito, mas o push para ecoup foi rejeitado pelo GitHub.
+
+          Causa provável: o merge atualiza arquivo(s) dentro de `.github/workflows/` e o GITHUB_TOKEN (token de GitHub App usado pelo Actions) nunca recebe permissão para tocar esses arquivos, em nenhuma configuração do bloco de escopos do workflow (restrição fixa da plataforma, não é bug de configuração).
+
+          Como resolver no clone de dev (com uma conta que tenha o escopo `workflow`, nunca com push forçado):
+          1. git checkout ecoup && git pull origin ecoup
+          2. git fetch origin main && git merge origin/main
+          3. git push origin ecoup (com credencial pessoal com escopo `workflow`)
+
+          Quando ecoup passar a conter main, o GitHub fecha este PR automaticamente.
+
+          PR aberto automaticamente pelo workflow ecoup-sync.
+          PR_EOF
+              )
+            else
+              BODY=$(cat <<'PR_EOF'
           O merge diário automático de main em ecoup encontrou conflito e foi abortado. Nenhum push foi feito.
 
           Como resolver no clone de dev:
@@ -134,12 +178,13 @@ jobs:
 
           PR aberto automaticamente pelo workflow ecoup-sync.
           PR_EOF
-            )
+              )
+            fi
             gh pr create --repo "$GITHUB_REPOSITORY" --base ecoup --head main \
               --title "[ecoup-sync] Conflito no merge diário main -> ecoup" \
               --body "$BODY"
           else
             echo "PR de conflito ja aberto; nao sera duplicado."
           fi
-          echo "::error::conflito no merge main -> ecoup; PR aberto para resolucao manual"
+          echo "::error::merge main -> ecoup nao concluido; PR aberto para resolucao manual"
           exit 1
