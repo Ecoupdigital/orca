@@ -2755,7 +2755,13 @@
             "1ff1c77616": "브라우저",
             "586d2ac445": "터미널",
             "addSplitPane": "분할 창 추가",
-            "closePaneColumn": "분할 창 닫기"
+            "closePaneColumn": "분할 창 닫기",
+            "restoreSplit": "Restore split",
+            "maximizePane": "Maximize pane",
+            "restoreSplitTip": "Back to the split grid",
+            "maximizePaneTip": "Show this project full width — the split stays underneath",
+            "removeFromSplit": "Remove from split",
+            "removeFromSplitTip": "Remove from split — keeps the project and its terminals"
           },
           "AiVaultSessionDropLayer": {
             "dropOntoTerminalPane": "이 세션을 재개하려면 terminal 창에 놓으세요.",
@@ -4342,7 +4348,9 @@
           "setParentWorkspace": "상위 워크트리 설정...",
           "workspaceSection": "워크스페이스",
           "primaryDeleteDisabled": "기본 작업 트리는 삭제할 수 없습니다. 대신 프로젝트를 제거하세요.",
-          "deleteWorktree": "작업 트리 삭제"
+          "deleteWorktree": "작업 트리 삭제",
+          "removeFromSplit": "Remove from Split",
+          "openToTheSide": "Open to the Side"
         },
         "WorktreeList": {
           "d880ea0744": "그룹을 만들고 이 프로젝트를 그룹으로 이동하세요.",
@@ -5527,6 +5535,12 @@
             "description": "Pop-out Kanban board for monitoring agents across worktrees.",
             "copy": "Adds an Agent Dashboard entry to the left sidebar. Open it to monitor attention, working, and idle agents in a separate window and jump into their live terminals.",
             "toggleLabel": "Toggle Agent Dashboard"
+          },
+          "sideBySideWorkspaces": {
+            "title": "Side-by-side workspaces",
+            "description": "Show terminals from several projects at once by splitting the main area into per-project panes.",
+            "copy": "Open a project to the side from the sidebar to tile its terminals next to the current one. Drag between panes to resize.",
+            "toggleLabel": "Toggle side-by-side workspaces"
           }
         },
         "FloatingWorkspacePane": {
@@ -7715,6 +7729,10 @@
             "agentDashboard": {
               "title": "Agent Dashboard",
               "description": "Pop-out Kanban board for monitoring agents across worktrees."
+            },
+            "sideBySideWorkspaces": {
+              "title": "Side-by-side workspaces",
+              "description": "Show terminals from several projects at once by splitting the main area into per-project panes."
             }
           }
         },

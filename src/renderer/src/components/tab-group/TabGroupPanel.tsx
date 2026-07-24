@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import WorkspacePaneStripControls from './WorkspacePaneStripControls'
 import TabBar from '../tab-bar/TabBar'
 
 import { TabBarQuickCommandsButton } from '../tab-bar/TabBarQuickCommandsButton'
@@ -36,7 +37,8 @@ export default function TabGroupPanel({
   reserveClosedExplorerToggleSpace,
   reserveCollapsedSidebarHeaderSpace,
   isTabDragActive = false,
-  hoveredTabInsertion = null
+  hoveredTabInsertion = null,
+  workspacePaneControls = null
 }: {
   groupId: string
   worktreeId: string
@@ -52,6 +54,7 @@ export default function TabGroupPanel({
   reserveCollapsedSidebarHeaderSpace: boolean
   isTabDragActive?: boolean
   hoveredTabInsertion?: HoveredTabInsertion | null
+  workspacePaneControls?: 'grid' | 'maximized' | null
 }): React.JSX.Element {
   const rightSidebarOpen = useAppStore((state) => state.rightSidebarOpen)
   const sidebarOpen = useAppStore((state) => state.sidebarOpen)
@@ -272,6 +275,13 @@ export default function TabGroupPanel({
                 </Tooltip>
               ) : null}
             </div>
+            {workspacePaneControls ? (
+              <WorkspacePaneStripControls
+                worktreeId={worktreeId}
+                mode={workspacePaneControls}
+                buttonClassName={menuButtonClassName}
+              />
+            ) : null}
           </div>
           {/* Why: Electron drag hit-test respects no-drag only on DOM descendants, not z-index siblings, so this no-drag spacer keeps the floating right-sidebar toggle + window controls clickable. */}
           {reserveClosedExplorerToggleSpace && !rightSidebarOpen ? (
