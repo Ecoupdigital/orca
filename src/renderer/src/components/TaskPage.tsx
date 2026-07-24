@@ -241,6 +241,7 @@ import {
   getTaskProjectPickerGroups,
   normalizeTaskRepoSelection
 } from '@/components/task-page-default-repo-selection'
+import { withPaneFocusedRepoIncluded } from '@/components/task-page-pane-focus-repo-selection'
 import {
   getRepoBackedProviderAvailability,
   type RuntimeProviderPreflightStatus
@@ -3161,6 +3162,27 @@ export default function TaskPage(): React.JSX.Element {
   }, [eligibleRepos, pageData.preselectedRepoId, settings?.defaultRepoSelection])
 
   const [repoSelection, setRepoSelection] = useState<ReadonlySet<string>>(resolvedInitialSelection)
+
+  // Why (CTX-02): with side-by-side panes, focusing a different pane's project
+  // must surface its GitHub/PR/issue data on this already-open screen without
+  // leaving it. withPaneFocusedRepoIncluded is additive only — never drops a
+  // repo the user explicitly selected — so a deliberately narrowed picker is
+  // only ever broadened, not silently overridden. Flag-gated: outside the
+  // experimental split feature, activeRepoId changes 1:1 with explicit
+  // worktree navigation and must not touch this picker at all (EDGE-02).
+  const activeRepoIdForPaneFocus = useAppStore((s) => s.activeRepoId)
+  const experimentalSideBySideWorkspaces = settings?.experimentalSideBySideWorkspaces === true
+  useEffect(() => {
+    setRepoSelection((prev) =>
+      withPaneFocusedRepoIncluded(
+        prev,
+        activeRepoIdForPaneFocus,
+        eligibleRepos,
+        experimentalSideBySideWorkspaces
+      )
+    )
+  }, [activeRepoIdForPaneFocus, eligibleRepos, experimentalSideBySideWorkspaces])
+
   const taskPickerGroups = useMemo(
     () => getTaskProjectPickerGroups(eligibleRepos, repoSelection),
     [eligibleRepos, repoSelection]
