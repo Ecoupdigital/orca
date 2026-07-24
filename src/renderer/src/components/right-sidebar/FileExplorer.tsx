@@ -2,8 +2,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useAppStore } from '@/store'
-import { useActiveWorktree, useRepoById } from '@/store/selectors'
+import { useRepoById } from '@/store/selectors'
 import { basename, dirname } from '@/lib/path'
+import {
+  useFileTreeWorktree,
+  useFileTreeWorktreeId,
+  useIsFileTreePaneMode
+} from '@/components/file-tree/file-tree-context'
 import { useRuntimeFileListForWorktree } from '@/components/quick-open-file-list'
 import { folderRelativePathToIncludeGlob } from './file-search-include-pattern'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -57,7 +62,11 @@ import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner
 import { createNewTerminalTab } from '@/components/terminal/terminal-tab-create'
 
 function FileExplorerFiles(): React.JSX.Element {
-  const explorerView = useAppStore((s) => s.rightSidebarExplorerView)
+  const isPaneMode = useIsFileTreePaneMode()
+  const globalExplorerView = useAppStore((s) => s.rightSidebarExplorerView)
+  // Why: pane-mode explorers only render the Files view; search stays a
+  // global right-sidebar-only affordance for this phase.
+  const explorerView = isPaneMode ? 'files' : globalExplorerView
   const showRightSidebarFiles = useAppStore((s) => s.showRightSidebarFiles)
   const showRightSidebarSearch = useAppStore((s) => s.showRightSidebarSearch)
   const [nameFilterQuery, setNameFilterQuery] = useState('')
@@ -68,6 +77,12 @@ function FileExplorerFiles(): React.JSX.Element {
 
   const handleSelectExplorerView = useCallback(
     (view: RightSidebarExplorerView) => {
+      // Why: the view switch is hidden in pane mode (only Files exists there),
+      // so this is a belt-and-suspenders guard against the global search view
+      // ever being triggered from a pane explorer.
+      if (isPaneMode) {
+        return
+      }
       if (view === 'files') {
         showRightSidebarFiles()
         return
@@ -75,10 +90,10 @@ function FileExplorerFiles(): React.JSX.Element {
       const trimmedQuery = nameFilterQuery.trim()
       showRightSidebarSearch(trimmedQuery ? { query: trimmedQuery } : undefined)
     },
-    [nameFilterQuery, showRightSidebarFiles, showRightSidebarSearch]
+    [isPaneMode, nameFilterQuery, showRightSidebarFiles, showRightSidebarSearch]
   )
-  const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
-  const activeWorktree = useActiveWorktree()
+  const activeWorktreeId = useFileTreeWorktreeId()
+  const activeWorktree = useFileTreeWorktree()
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
   const supportsFolderDownload = useAppStore((s) => {
     const connectionId = activeRepo?.connectionId
@@ -123,11 +138,16 @@ function FileExplorerFiles(): React.JSX.Element {
     [activeRepo?.connectionId, activeRuntimeEnvironmentId, activeWorktreeId, worktreePath]
   )
   const isFilesViewActive = explorerView === 'files'
-  const visibleFilesWorktreePath = getVisibleFileExplorerWorktreePath({
-    explorerView,
-    rightSidebarOpen,
-    worktreePath
-  })
+  // Why: in pane mode the component only mounts once its column is expanded
+  // (lazy mount, added in 02-02), so mounted implies visible; the right-sidebar
+  // open/collapsed gate does not apply to panes.
+  const visibleFilesWorktreePath = isPaneMode
+    ? worktreePath
+    : getVisibleFileExplorerWorktreePath({
+        explorerView,
+        rightSidebarOpen,
+        worktreePath
+      })
   const repoName = activeRepo?.displayName ?? (worktreePath ? basename(worktreePath) : '')
   const activeRepoSupportsGit = activeRepo ? isGitRepoKind(activeRepo) : false
 
@@ -658,7 +678,11 @@ function FileExplorerFiles(): React.JSX.Element {
           showDotfiles={showDotfiles}
           onToggleDotfiles={handleToggleDotfiles}
         />
-        <FileExplorerQueryStrip view={explorerView} onSelectView={handleSelectExplorerView}>
+        <FileExplorerQueryStrip
+          view={explorerView}
+          onSelectView={handleSelectExplorerView}
+          hideViewSwitch={isPaneMode}
+        >
           {/* Why: keep both query rows mounted and cross-fade so the Names/Contents
              switch does not remount or shift when changing modes. */}
           <div className="relative min-h-7">
@@ -816,6 +840,11 @@ function FileExplorerFiles(): React.JSX.Element {
 }
 
 const FileExplorerFilesMemo = React.memo(FileExplorerFiles)
+
+/** Reusable body rendered by the global explorer (no provider, falls back to
+ *  the store's activeWorktreeId) and by FileTree per pane (wrapped in
+ *  FileTreeWorktreeContext.Provider). */
+export const FileExplorerBody = FileExplorerFilesMemo
 
 function FileExplorer(): React.JSX.Element {
   return <FileExplorerFilesMemo />
