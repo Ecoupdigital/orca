@@ -3257,6 +3257,11 @@ export type PersistedUIState = {
   hideAutomationGeneratedWorkspaces?: boolean
   /** Per-worktree Explorer dotfile visibility. Missing entries inherit the default: show. */
   showDotfilesByWorktree?: Record<string, boolean>
+  /** Per-pane embedded explorer state, keyed by worktreeId (panes are
+   *  worktree-keyed; see WorkspacePaneNode). Missing entries = collapsed at
+   *  default width. Sanitized on hydration (bad keys/types dropped, width
+   *  clamped); entries for removed worktrees are pruned on worktree removal. */
+  paneExplorerByWorktree?: Record<string, { expanded: boolean; width: number }>
   filterRepoIds: string[]
   collapsedGroups: string[]
   uiZoomLevel: number

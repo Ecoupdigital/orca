@@ -639,6 +639,7 @@ function App(): React.JSX.Element {
   const hideDefaultBranchWorkspace = useAppStore((s) => s.hideDefaultBranchWorkspace)
   const hideAutomationGeneratedWorkspaces = useAppStore((s) => s.hideAutomationGeneratedWorkspaces)
   const showDotfilesByWorktree = useAppStore((s) => s.showDotfilesByWorktree)
+  const paneExplorerByWorktree = useAppStore((s) => s.paneExplorerByWorktree)
   const filterRepoIds = useAppStore((s) => s.filterRepoIds)
   const acknowledgedAgentsByPaneKey = useAppStore((s) => s.acknowledgedAgentsByPaneKey)
   const persistedUIReady = useAppStore((s) => s.persistedUIReady)
@@ -1340,6 +1341,7 @@ function App(): React.JSX.Element {
         hideDefaultBranchWorkspace,
         hideAutomationGeneratedWorkspaces,
         showDotfilesByWorktree,
+        paneExplorerByWorktree,
         filterRepoIds,
         // Why (#9002): activeView is deliberately NOT included here. It used to
         // ride this same 150ms writer (#8265), which meant every top-level view
@@ -1370,6 +1372,7 @@ function App(): React.JSX.Element {
     hideDefaultBranchWorkspace,
     hideAutomationGeneratedWorkspaces,
     showDotfilesByWorktree,
+    paneExplorerByWorktree,
     filterRepoIds,
     acknowledgedAgentsByPaneKey
   ])

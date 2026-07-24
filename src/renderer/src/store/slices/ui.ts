@@ -6,6 +6,7 @@ import {
   findPrevLiveNonTaskStackHistoryIndex,
   findPrevLiveWorktreeHistoryIndex
 } from './worktree-nav-history'
+import { sanitizePaneExplorerByWorktree } from './pane-explorer'
 import type {
   ChangelogData,
   CustomPet,
@@ -407,7 +408,9 @@ function hydrateTrustedOrcaHooks(
   return filterTrustedOrcaHooksToValidRepos(sanitized, validRepoIds)
 }
 
-function isSafePersistedRecordKey(key: string): boolean {
+// Why exported: pane-explorer.ts (a different store slice) needs the same
+// prototype-pollution guard for its own persisted-record sanitizer.
+export function isSafePersistedRecordKey(key: string): boolean {
   return key !== '__proto__' && key !== 'constructor' && key !== 'prototype'
 }
 
@@ -2420,6 +2423,12 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         hideDefaultBranchWorkspace: ui.hideDefaultBranchWorkspace ?? false,
         hideAutomationGeneratedWorkspaces: ui.hideAutomationGeneratedWorkspaces === true,
         showDotfilesByWorktree: sanitizeShowDotfilesByWorktree(ui.showDotfilesByWorktree),
+        // Why: startup hydrates UI before repo/worktree catalogs, mirroring the
+        // filterRepoIds deferral above — orphan entries for now-gone worktrees
+        // are not accumulated going forward because worktree removal purges
+        // this record (prunePaneExplorerState) and the debounced writer then
+        // persists the pruned state.
+        paneExplorerByWorktree: sanitizePaneExplorerByWorktree(ui.paneExplorerByWorktree),
         // Why: startup hydrates UI before repo catalogs, so defer repo-filter validation to the all-host refresh.
         filterRepoIds:
           validRepoIds.size === 0

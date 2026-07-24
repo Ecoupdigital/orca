@@ -5,6 +5,7 @@ import {
   PANE_EXPLORER_MIN_WIDTH,
   clampPaneExplorerWidth,
   prunePaneExplorerState,
+  sanitizePaneExplorerByWorktree,
   type PaneExplorerEntry
 } from './pane-explorer'
 import { createTestStore } from './store-test-helpers'
@@ -100,6 +101,80 @@ describe('pane-explorer slice', () => {
         new Set(['wt-unrelated'])
       )
       expect(result.paneExplorerByWorktree).toBe(byWorktree)
+    })
+  })
+
+  describe('sanitizePaneExplorerByWorktree', () => {
+    it('returns an empty record for non-object input', () => {
+      expect(sanitizePaneExplorerByWorktree(null)).toEqual({})
+      expect(sanitizePaneExplorerByWorktree(undefined)).toEqual({})
+      expect(sanitizePaneExplorerByWorktree('nope')).toEqual({})
+      expect(sanitizePaneExplorerByWorktree(42)).toEqual({})
+    })
+
+    it('returns an empty record for array input', () => {
+      expect(sanitizePaneExplorerByWorktree([{ expanded: true, width: 240 }])).toEqual({})
+    })
+
+    it('drops entries with an empty key', () => {
+      const result = sanitizePaneExplorerByWorktree({ '': { expanded: true, width: 240 } })
+      expect(result).toEqual({})
+    })
+
+    it('drops entries with an unsafe (prototype-pollution) key', () => {
+      const result = sanitizePaneExplorerByWorktree({
+        __proto__: { expanded: true, width: 240 },
+        constructor: { expanded: true, width: 240 },
+        prototype: { expanded: true, width: 240 },
+        wt1: { expanded: true, width: 240 }
+      })
+      expect(result).toEqual({ wt1: { expanded: true, width: 240 } })
+    })
+
+    it('drops entries whose expanded field is not a boolean', () => {
+      const result = sanitizePaneExplorerByWorktree({
+        wt1: { expanded: 'yes', width: 240 }
+      })
+      expect(result).toEqual({})
+    })
+
+    it('drops entries whose width field is not a number', () => {
+      const result = sanitizePaneExplorerByWorktree({
+        wt1: { expanded: true, width: '240' }
+      })
+      expect(result).toEqual({})
+    })
+
+    it('drops entries that are not plain objects', () => {
+      const result = sanitizePaneExplorerByWorktree({ wt1: null, wt2: 'nope', wt3: [1, 2] })
+      expect(result).toEqual({})
+    })
+
+    it('clamps width on valid entries', () => {
+      const result = sanitizePaneExplorerByWorktree({
+        wt1: { expanded: true, width: 100 },
+        wt2: { expanded: false, width: 9999 }
+      })
+      expect(result).toEqual({
+        wt1: { expanded: true, width: PANE_EXPLORER_MIN_WIDTH },
+        wt2: { expanded: false, width: PANE_EXPLORER_MAX_WIDTH }
+      })
+    })
+
+    it('preserves valid entries untouched (round-trip)', () => {
+      const input = {
+        wt1: { expanded: true, width: 320 },
+        wt2: { expanded: false, width: 160 }
+      }
+      expect(sanitizePaneExplorerByWorktree(input)).toEqual(input)
+    })
+
+    it('accepts a custom isSafeKey predicate', () => {
+      const result = sanitizePaneExplorerByWorktree(
+        { wt1: { expanded: true, width: 240 }, blocked: { expanded: true, width: 240 } },
+        (key) => key !== 'blocked'
+      )
+      expect(result).toEqual({ wt1: { expanded: true, width: 240 } })
     })
   })
 })

@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
+import { isSafePersistedRecordKey } from './ui'
 
 export const PANE_EXPLORER_MIN_WIDTH = 160
 export const PANE_EXPLORER_MAX_WIDTH = 480
@@ -31,6 +32,33 @@ export function getPaneExplorerEntry(
   worktreeId: string
 ): PaneExplorerEntry {
   return byWorktree[worktreeId] ?? { expanded: false, width: PANE_EXPLORER_DEFAULT_WIDTH }
+}
+
+// Why: persisted JSON may be tampered/corrupt/hand-edited — reject arrays,
+// prototype-pollution keys, and entries with wrong shapes; clamp width so a
+// stale/edited value can't break the resize layout on hydration.
+export function sanitizePaneExplorerByWorktree(
+  value: unknown,
+  isSafeKey: (key: string) => boolean = isSafePersistedRecordKey
+): Record<string, PaneExplorerEntry> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  const out: Record<string, PaneExplorerEntry> = {}
+  for (const [worktreeId, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!worktreeId || !isSafeKey(worktreeId)) {
+      continue
+    }
+    if (entry === null || typeof entry !== 'object') {
+      continue
+    }
+    const { expanded, width } = entry as { expanded?: unknown; width?: unknown }
+    if (typeof expanded !== 'boolean' || typeof width !== 'number') {
+      continue
+    }
+    out[worktreeId] = { expanded, width: clampPaneExplorerWidth(width) }
+  }
+  return out
 }
 
 /** Purge-path helper (mirrors pruneWorkspaceSplitState): drop entries for
