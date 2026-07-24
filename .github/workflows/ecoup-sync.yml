@@ -1,0 +1,145 @@
+name: EcoUp Sync
+
+run-name: Sync diário upstream -> main -> ecoup
+
+on:
+  schedule:
+    # 07:23 UTC = 04:23 BRT, antes do início do dia de trabalho
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+    inputs:
+      simulate_ff_failure:
+        description: 'Simular falha de fast-forward (testa a criação de issue sem tocar no branch main)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ecoup-sync
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  sync-main:
+    name: Espelhar upstream em main (fast-forward only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/stablyai/orca.git
+          git fetch --no-tags upstream main
+
+      - name: Avancar main por fast-forward ou abrir issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIMULATE: ${{ inputs.simulate_ff_failure == true && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          UPSTREAM_SHA=$(git rev-parse upstream/main)
+          FORK_SHA=$(git rev-parse origin/main)
+          if [ "$SIMULATE" != "true" ] && git merge-base --is-ancestor origin/main upstream/main; then
+            if [ "$UPSTREAM_SHA" = "$FORK_SHA" ]; then
+              echo "main ja espelha o upstream ($FORK_SHA)"
+              exit 0
+            fi
+            git push origin upstream/main:refs/heads/main
+            echo "main avancou fast-forward: $FORK_SHA -> $UPSTREAM_SHA"
+            exit 0
+          fi
+          echo "Fast-forward impossivel (ou simulacao ativa). Force push NUNCA sera usado."
+          OPEN_COUNT=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "[ecoup-sync] in:title" --json number --jq 'length')
+          if [ "$OPEN_COUNT" = "0" ]; then
+            BODY=$(cat <<'ISSUE_EOF'
+          O sync diário detectou que o branch main do fork não pode avançar por fast-forward até o stablyai/orca.
+
+          Causas prováveis: main recebeu commits próprios (main deve ser espelho puro, sem commits do fork) ou o upstream reescreveu histórico.
+
+          Como resolver (manual, nunca com push forçado):
+          1. Atualizar o clone: git fetch origin && git fetch https://github.com/stablyai/orca.git main
+          2. Investigar a divergência: git log --oneline origin/main --not FETCH_HEAD
+          3. Se main tem commits próprios por engano, mover esses commits para um branch próprio e restaurar main ao estado espelho.
+          4. Re-executar o workflow ecoup-sync (aba Actions) depois de corrigir.
+
+          Issue aberta automaticamente pelo workflow ecoup-sync.
+          ISSUE_EOF
+            )
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "[ecoup-sync] main não avança fast-forward até o upstream" \
+              --body "$BODY"
+          else
+            echo "Issue de sync ja aberta; nao sera duplicada."
+          fi
+          echo "::error::main nao avanca fast-forward; issue aberta para resolucao manual"
+          exit 1
+
+  merge-ecoup:
+    name: Merge diario main -> ecoup (conflito abre PR)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: sync-main
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout ecoup
+        uses: actions/checkout@v6
+        with:
+          ref: ecoup
+          fetch-depth: 0
+
+      - name: Configurar identidade git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge main em ecoup ou abrir PR de conflito
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "ecoup ja contem main; nada a fazer"
+            exit 0
+          fi
+          if git merge --no-edit origin/main; then
+            git push origin HEAD:refs/heads/ecoup
+            echo "merge de main em ecoup concluido sem conflito"
+            exit 0
+          fi
+          git merge --abort
+          OPEN_PRS=$(gh pr list --repo "$GITHUB_REPOSITORY" --base ecoup --head main --state open --json number --jq 'length')
+          if [ "$OPEN_PRS" = "0" ]; then
+            BODY=$(cat <<'PR_EOF'
+          O merge diário automático de main em ecoup encontrou conflito e foi abortado. Nenhum push foi feito.
+
+          Como resolver no clone de dev:
+          1. git checkout ecoup && git pull origin ecoup
+          2. git fetch origin main && git merge origin/main
+          3. Resolver os conflitos, commitar e dar push em ecoup.
+
+          Quando ecoup passar a conter main, o GitHub fecha este PR automaticamente.
+
+          PR aberto automaticamente pelo workflow ecoup-sync.
+          PR_EOF
+            )
+            gh pr create --repo "$GITHUB_REPOSITORY" --base ecoup --head main \
+              --title "[ecoup-sync] Conflito no merge diário main -> ecoup" \
+              --body "$BODY"
+          else
+            echo "PR de conflito ja aberto; nao sera duplicado."
+          fi
+          echo "::error::conflito no merge main -> ecoup; PR aberto para resolucao manual"
+          exit 1
