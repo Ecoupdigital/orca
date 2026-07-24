@@ -782,6 +782,20 @@ export type TabGroupLayoutNode =
       ratio?: number
     }
 
+// ─── Workspace Split View (side-by-side worktree panes) ─────────────
+/** Recursive split tree over whole worktree surfaces — the outer analogue of
+ *  TabGroupLayoutNode. null layout = classic single-worktree view. */
+export type WorkspacePaneNode =
+  | { type: 'pane'; worktreeId: string }
+  | {
+      type: 'split'
+      direction: TabGroupSplitDirection
+      first: WorkspacePaneNode
+      second: WorkspacePaneNode
+      /** Flex ratio of the first child (0–1). Defaults to 0.5 if absent. */
+      ratio?: number
+    }
+
 // ─── Unified Tab ────────────────────────────────────────────────────
 export type TabContentType =
   | 'terminal'
@@ -1091,6 +1105,15 @@ export type WorkspaceSessionState = {
    *  Used on startup to eagerly re-spawn PTY processes so the Active filter
    *  works immediately after restart. */
   activeWorktreeIdsOnShutdown?: string[]
+  /** Side-by-side pane tree at shutdown (experimentalSideBySideWorkspaces).
+   *  Restored only when the flag is on and every leaf still resolves. */
+  workspaceSplitLayoutOnShutdown?: WorkspacePaneNode
+  /** Saved split associations keyed by anchor project, plus which one was on
+   *  screen and their recency order. All additive-optional. */
+  workspaceSplitLayoutsByAnchorOnShutdown?: Record<string, WorkspacePaneNode>
+  activeWorkspaceSplitAnchorOnShutdown?: string | null
+  workspaceSplitAnchorMruOnShutdown?: string[]
+  workspaceSplitMaximizedPaneOnShutdown?: string | null
   /** Editor files that were open at shutdown, keyed by worktree ID.
    *  Only edit-mode files are persisted — diffs and conflict views are
    *  transient and not restored. */
@@ -2921,6 +2944,8 @@ export type GlobalSettings = {
   experimentalNewWorktreeCardStyle?: boolean
   /** Experimental: per-workspace on-demand environment recipes and setup surface. */
   experimentalEphemeralVms?: boolean
+  /** Experimental: side-by-side worktree panes in the main area. */
+  experimentalSideBySideWorkspaces?: boolean
   /** Compact worktree cards: hide the metadata row when title and branch say the same thing. */
   compactWorktreeCards: boolean
   /** Legacy persisted key from the Experimental rollout; new writes use compactWorktreeCards. */

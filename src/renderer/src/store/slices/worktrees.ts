@@ -35,6 +35,11 @@ import {
   dropWorktreeRowsForRemovedRuntimeEnvironments,
   isRemovedRuntimeHostId
 } from './stale-runtime-host-rows'
+import {
+  findWorkspaceSplitAnchorForWorktree,
+  pruneWorkspaceSplitState,
+  workspaceSplitContainsPane
+} from './workspace-split-view'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
@@ -2253,6 +2258,19 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
       s.defaultTerminalTabsAppliedByWorktreeId
     ),
     activeWorktreeId: removedActive ? null : s.activeWorktreeId,
+    // Why: side-by-side panes (active AND saved) must never point at removed
+    // worktrees; this runs regardless of the experimental flag.
+    ...pruneWorkspaceSplitState(s, worktreeIdSet),
+    // Why: purging the focused worktree nulls activeWorktreeId below, and a
+    // visible split with no focused pane is an invalid state — clear the
+    // on-screen split too; the pruned saved pairings survive for later.
+    ...(removedActive
+      ? {
+          workspaceSplitLayout: null,
+          activeWorkspaceSplitAnchorId: null,
+          workspaceSplitMaximizedPaneId: null
+        }
+      : {}),
     activeWorkspaceKey: (() => {
       if (s.activeWorkspaceKey && worktreeIdSet.has(s.activeWorkspaceKey)) {
         return null
@@ -4398,9 +4416,50 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           activeWorktreeId: null,
           activeWorkspaceKey: null,
           // Why: clearing/activating a worktree must dismiss the background-creation panel so the user isn't stranded on it.
-          activePendingCreationId: null
+          activePendingCreationId: null,
+          // No focused worktree means nothing to show; saved splits survive.
+          workspaceSplitLayout: null,
+          activeWorkspaceSplitAnchorId: null,
+          workspaceSplitMaximizedPaneId: null
         }
       }
+
+      // Why: splits are project associations. Activating a member of a saved
+      // split restores that split; activating anything else shows it alone,
+      // leaving the current split behind intact for its own members. With the
+      // flag off, activation clears any residual on-screen split immediately
+      // (saved pairings stay dormant until the flag returns) — otherwise the
+      // restore below would resurrect the feature until an app restart.
+      const splitFlagEnabled = s.settings?.experimentalSideBySideWorkspaces === true
+      let nextSplitLayout = splitFlagEnabled ? s.workspaceSplitLayout : null
+      let nextSplitAnchorId = splitFlagEnabled ? s.activeWorkspaceSplitAnchorId : null
+      let nextSplitAnchorMru = s.workspaceSplitAnchorMru
+      if (
+        splitFlagEnabled &&
+        (!nextSplitLayout || !workspaceSplitContainsPane(nextSplitLayout, worktreeId))
+      ) {
+        const savedAnchorId = findWorkspaceSplitAnchorForWorktree(s, worktreeId)
+        if (savedAnchorId) {
+          nextSplitLayout = s.workspaceSplitLayoutsByAnchor[savedAnchorId] ?? null
+          nextSplitAnchorId = nextSplitLayout ? savedAnchorId : null
+          if (nextSplitLayout) {
+            nextSplitAnchorMru = [
+              savedAnchorId,
+              ...s.workspaceSplitAnchorMru.filter((anchorId) => anchorId !== savedAnchorId)
+            ]
+          }
+        } else {
+          nextSplitLayout = null
+          nextSplitAnchorId = null
+        }
+      }
+      // Why: focusing anything other than the maximized pane must bring the
+      // grid (or the new single view) back on screen.
+      const nextSplitMaximizedPaneId =
+        nextSplitAnchorId === s.activeWorkspaceSplitAnchorId &&
+        s.workspaceSplitMaximizedPaneId === worktreeId
+          ? s.workspaceSplitMaximizedPaneId
+          : null
 
       const worktree = findKnownWorktreeById(s, worktreeId)
       shouldClearUnread = Boolean(worktree?.isUnread)
@@ -4570,7 +4629,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         nextActiveTabTypeByWorktree !== s.activeTabTypeByWorktree ||
         nextEverActivated !== s.everActivatedWorktreeIds ||
         nextWorktrees !== s.worktreesByRepo ||
-        nextDetectedWorktrees !== s.detectedWorktreesByRepo
+        nextDetectedWorktrees !== s.detectedWorktreesByRepo ||
+        nextSplitLayout !== s.workspaceSplitLayout ||
+        nextSplitAnchorId !== s.activeWorkspaceSplitAnchorId ||
+        nextSplitAnchorMru !== s.workspaceSplitAnchorMru ||
+        nextSplitMaximizedPaneId !== s.workspaceSplitMaximizedPaneId
       if (!hasStateChange) {
         // Why: preserve the root Zustand reference on a no-op re-activation so session persistence/runtime sync don't fan out.
         return s
@@ -4590,6 +4653,18 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         ...(nextWorktrees !== s.worktreesByRepo ? { worktreesByRepo: nextWorktrees } : {}),
         ...(nextDetectedWorktrees !== s.detectedWorktreesByRepo
           ? { detectedWorktreesByRepo: nextDetectedWorktrees }
+          : {}),
+        ...(nextSplitLayout !== s.workspaceSplitLayout
+          ? { workspaceSplitLayout: nextSplitLayout }
+          : {}),
+        ...(nextSplitAnchorId !== s.activeWorkspaceSplitAnchorId
+          ? { activeWorkspaceSplitAnchorId: nextSplitAnchorId }
+          : {}),
+        ...(nextSplitAnchorMru !== s.workspaceSplitAnchorMru
+          ? { workspaceSplitAnchorMru: nextSplitAnchorMru }
+          : {}),
+        ...(nextSplitMaximizedPaneId !== s.workspaceSplitMaximizedPaneId
+          ? { workspaceSplitMaximizedPaneId: nextSplitMaximizedPaneId }
           : {}),
         ...tabsByWorktreeUpdate
       }

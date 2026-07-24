@@ -19,6 +19,7 @@ import {
   Bell,
   BellOff,
   CircleX,
+  Columns2,
   Moon,
   Pencil,
   Pin,
@@ -44,6 +45,8 @@ import type {
 import { runWorktreeBatchDelete, runWorktreeDelete } from './delete-worktree-flow'
 import { runSleepWorktrees } from './sleep-worktree-flow'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
+import { openWorktreeToTheSide } from '@/lib/open-worktree-to-the-side'
+import { workspaceSplitContainsPane } from '@/store/slices/workspace-split-view'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
 import { VIRTUALIZED_SCROLL_ANCHOR_RECORD_EVENT } from '@/hooks/useVirtualizedScrollAnchor'
 import {
@@ -384,6 +387,12 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const workspaceScope = parseWorkspaceKey(worktree.id)
   const folderWorkspaceId =
     workspaceScope?.type === 'folder' ? workspaceScope.folderWorkspaceId : null
+  const sideBySideWorkspacesEnabled = useAppStore(
+    (s) => s.settings?.experimentalSideBySideWorkspaces === true
+  )
+  const isInActiveSplit = useAppStore((s) =>
+    workspaceSplitContainsPane(s.workspaceSplitLayout, worktree.id)
+  )
   const sleepableWorktrees = useMemo(
     () =>
       activeContextWorktrees.filter((item) =>
@@ -806,6 +815,31 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
           <DropdownMenuSeparator />
           {!isMultiContext && (
             <>
+              {sideBySideWorkspacesEnabled && !folderWorkspaceId ? (
+                isInActiveSplit ? (
+                  <DropdownMenuItem
+                    onSelect={() => useAppStore.getState().closeWorkspacePane(worktree.id)}
+                    disabled={isDeleting}
+                  >
+                    <CircleX className="size-3.5" />
+                    {translate(
+                      'auto.components.sidebar.WorktreeContextMenu.removeFromSplit',
+                      'Remove from Split'
+                    )}
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onSelect={() => openWorktreeToTheSide(worktree.id)}
+                    disabled={isDeleting}
+                  >
+                    <Columns2 className="size-3.5" />
+                    {translate(
+                      'auto.components.sidebar.WorktreeContextMenu.openToTheSide',
+                      'Open to the Side'
+                    )}
+                  </DropdownMenuItem>
+                )
+              ) : null}
               <WorktreeOpenInSubMenu
                 worktreePath={worktree.path}
                 connectionId={repo?.connectionId ?? null}
