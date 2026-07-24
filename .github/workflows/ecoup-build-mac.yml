@@ -58,7 +58,7 @@ jobs:
           command: pnpm install --frozen-lockfile
 
       - name: Build dmg (sem notarizacao, assinatura ad-hoc)
-        run: pnpm build:mac
+        run: pnpm build:mac --publish never
 
       - name: Conferir artefato
         run: ls -la dist/orca-macos-*.dmg
