@@ -40,6 +40,7 @@ import {
   pruneWorkspaceSplitState,
   workspaceSplitContainsPane
 } from './workspace-split-view'
+import { prunePaneExplorerState } from './pane-explorer'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
@@ -2261,6 +2262,10 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
     // Why: side-by-side panes (active AND saved) must never point at removed
     // worktrees; this runs regardless of the experimental flag.
     ...pruneWorkspaceSplitState(s, worktreeIdSet),
+    // Why: the embedded per-pane explorer state (expanded/width) is keyed by
+    // worktreeId same as the split tree above; without this a removed
+    // worktree's explorer entry survives as an orphan in persisted state.
+    ...prunePaneExplorerState(s, worktreeIdSet),
     // Why: purging the focused worktree nulls activeWorktreeId below, and a
     // visible split with no focused pane is an invalid state — clear the
     // on-screen split too; the pruned saved pairings survive for later.
@@ -3504,6 +3509,15 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           ? s.openFiles.some((f) => f.id === s.activeFileId && f.worktreeId === worktreeId)
           : false
         const removedActiveWorktree = s.activeWorktreeId === worktreeId
+        // Why (EDGE-01): this single-worktree teardown path predates side-by-side
+        // panes and didn't touch split/explorer state — only the bulk reconcile /
+        // remove-project paths did (via buildWorktreePurgeState), leaving a stale
+        // pane (and, now, an orphan explorer entry) until the next background
+        // worktree scan. Purge both here too so the most common delete flow
+        // (sidebar "Delete") closes an open pane immediately, not eventually.
+        const removedWorktreeIdSet = new Set([worktreeId])
+        const prunedSplitState = pruneWorkspaceSplitState(s, removedWorktreeIdSet)
+        const prunedPaneExplorerState = prunePaneExplorerState(s, removedWorktreeIdSet)
         const nextEverActivatedWorktreeIds = s.everActivatedWorktreeIds.has(worktreeId)
           ? new Set([...s.everActivatedWorktreeIds].filter((id) => id !== worktreeId))
           : s.everActivatedWorktreeIds
@@ -3610,7 +3624,20 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           activeTabType: removedActiveWorktree || activeFileCleared ? 'terminal' : s.activeTabType,
           everActivatedWorktreeIds: nextEverActivatedWorktreeIds,
           lastVisitedAtByWorktreeId: nextLastVisitedAtByWorktreeId,
-          sortEpoch: s.sortEpoch + 1
+          sortEpoch: s.sortEpoch + 1,
+          ...prunedSplitState,
+          // Why: mirrors buildWorktreePurgeState — a visible split with no
+          // focused pane is an invalid state, so force-clear the on-screen
+          // split when the removed worktree was the focused one, even if
+          // pruning alone would have left a single-leaf remnant.
+          ...(removedActiveWorktree
+            ? {
+                workspaceSplitLayout: null,
+                activeWorkspaceSplitAnchorId: null,
+                workspaceSplitMaximizedPaneId: null
+              }
+            : {}),
+          ...prunedPaneExplorerState
         }
       })
       get().removeWorkspaceSpaceWorktrees?.([worktreeId])

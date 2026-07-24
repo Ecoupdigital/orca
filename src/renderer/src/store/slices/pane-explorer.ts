@@ -65,12 +65,16 @@ export function sanitizePaneExplorerByWorktree(
  *  removed worktrees so closing a project leaves no orphan explorer state.
  *  Returns the SAME paneExplorerByWorktree reference when nothing changes,
  *  so callers can spread this into a wider store patch without triggering
- *  spurious re-renders on unrelated purges. */
+ *  spurious re-renders on unrelated purges.
+ *  Why the `?? {}` fallback: mirrors pruneWorkspaceSplitState's contract —
+ *  buildWorktreePurgeState (and removeWorktree) call this unconditionally,
+ *  and several worktree-isolation test stores construct partial AppState
+ *  mocks without this slice. */
 export function prunePaneExplorerState(
   state: Pick<AppState, 'paneExplorerByWorktree'>,
   removedWorktreeIds: ReadonlySet<string>
 ): Pick<AppState, 'paneExplorerByWorktree'> {
-  const current = state.paneExplorerByWorktree
+  const current = state.paneExplorerByWorktree ?? {}
   if (removedWorktreeIds.size === 0) {
     return { paneExplorerByWorktree: current }
   }

@@ -4002,6 +4002,49 @@ describe('removeWorktree state cleanup', () => {
     })
   })
 
+  it('purges the embedded per-pane explorer entry for the removed worktree (EDGE-01)', async () => {
+    const store = createTestStore()
+    const wt = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
+
+    store.setState({
+      worktreesByRepo: { repo1: [wt] },
+      paneExplorerByWorktree: {
+        'repo1::/path/wt1': { expanded: true, width: 320 },
+        'repo1::/path/wt2': { expanded: false, width: 240 }
+      }
+    } as Partial<AppState>)
+
+    await store.getState().removeWorktree('repo1::/path/wt1')
+
+    expect(store.getState().paneExplorerByWorktree).toEqual({
+      'repo1::/path/wt2': { expanded: false, width: 240 }
+    })
+  })
+
+  it('closes an open split pane when the removed worktree was part of the pair (EDGE-01)', async () => {
+    const store = createTestStore()
+    const wt1 = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
+    const wt2 = makeWorktree({ id: 'repo1::/path/wt2', repoId: 'repo1', path: '/path/wt2' })
+
+    store.setState({
+      worktreesByRepo: { repo1: [wt1, wt2] },
+      workspaceSplitLayout: {
+        type: 'split',
+        direction: 'horizontal',
+        first: { type: 'pane', worktreeId: wt1.id },
+        second: { type: 'pane', worktreeId: wt2.id },
+        ratio: 0.5
+      }
+    } as Partial<AppState>)
+
+    await store.getState().removeWorktree(wt1.id)
+
+    // Why not eventual-only: this teardown path predates side-by-side panes
+    // and previously left a stale split (and, without the EDGE-01 fix, an
+    // orphan explorer entry) until the next background worktree scan.
+    expect(store.getState().workspaceSplitLayout).toBeNull()
+  })
+
   it('cleans up activeTabIdByWorktree for the removed worktree', async () => {
     const store = createTestStore()
     const wt = makeWorktree({ id: 'repo1::/path/wt1', repoId: 'repo1', path: '/path/wt1' })
