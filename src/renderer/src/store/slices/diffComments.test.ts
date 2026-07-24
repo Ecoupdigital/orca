@@ -146,6 +146,7 @@ import { createOrcaProfilesSlice } from './orca-profiles'
 import { createNewIssueDraftSlice } from './new-issue-draft'
 import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createWorkspaceSplitViewSlice } from './workspace-split-view'
+import { createPaneExplorerSlice } from './pane-explorer'
 
 function createTestStore() {
   return create<AppState>()((...a) => ({
@@ -189,7 +190,8 @@ function createTestStore() {
     ...createOrcaProfilesSlice(...a),
     ...createNewIssueDraftSlice(...a),
     ...createRemoteServerUpdatesSlice(...a),
-    ...createWorkspaceSplitViewSlice(...a)
+    ...createWorkspaceSplitViewSlice(...a),
+    ...createPaneExplorerSlice(...a)
   }))
 }
 

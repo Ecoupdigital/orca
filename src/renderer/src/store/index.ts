@@ -41,6 +41,7 @@ import { createOrcaProfilesSlice } from './slices/orca-profiles'
 import { createNewIssueDraftSlice } from './slices/new-issue-draft'
 import { createRemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import { createWorkspaceSplitViewSlice } from './slices/workspace-split-view'
+import { createPaneExplorerSlice } from './slices/pane-explorer'
 import { e2eConfig } from '@/lib/e2e-config'
 import type { createWebRuntimeSessionTerminal } from '@/runtime/web-runtime-session'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
@@ -90,7 +91,8 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createOrcaProfilesSlice(...a),
   ...createNewIssueDraftSlice(...a),
   ...createRemoteServerUpdatesSlice(...a),
-  ...createWorkspaceSplitViewSlice(...a)
+  ...createWorkspaceSplitViewSlice(...a),
+  ...createPaneExplorerSlice(...a)
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())

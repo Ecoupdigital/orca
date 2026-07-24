@@ -39,6 +39,7 @@ import type { OrcaProfilesSlice } from './slices/orca-profiles'
 import type { NewIssueDraftSlice } from './slices/new-issue-draft'
 import type { RemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import type { WorkspaceSplitViewSlice } from './slices/workspace-split-view'
+import type { PaneExplorerSlice } from './slices/pane-explorer'
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
@@ -80,4 +81,5 @@ export type AppState = RepoSlice &
   OrcaProfilesSlice &
   NewIssueDraftSlice &
   RemoteServerUpdatesSlice &
-  WorkspaceSplitViewSlice
+  WorkspaceSplitViewSlice &
+  PaneExplorerSlice
