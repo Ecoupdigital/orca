@@ -1,0 +1,101 @@
+name: EcoUp Build Mac
+
+run-name: Build dmg arm64 ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - 'ecoup-v*'
+  workflow_dispatch:
+
+concurrency:
+  group: ecoup-build-mac-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build-dmg:
+    name: Build dmg arm64 sem notarizacao
+    runs-on: macos-14
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Cache electron-builder downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ecoup-electron-builder-mac-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ecoup-electron-builder-mac-
+
+      - name: Install dependencies (retry para 504 do CDN do Electron)
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: pnpm install --frozen-lockfile
+
+      - name: Build dmg (sem notarizacao, assinatura ad-hoc)
+        run: pnpm build:mac
+
+      - name: Conferir artefato
+        run: ls -la dist/orca-macos-*.dmg
+
+      - name: Upload artifact (execucao manual sem tag)
+        if: ${{ !startsWith(github.ref, 'refs/tags/ecoup-v') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: orca-macos-arm64-dmg
+          path: dist/orca-macos-*.dmg
+          if-no-files-found: error
+
+      - name: Publicar release
+        if: ${{ startsWith(github.ref, 'refs/tags/ecoup-v') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="$GITHUB_REF_NAME"
+          UPSTREAM_VERSION=$(node -p "require('./package.json').version")
+          {
+            echo "Build do Orca (fork EcoUp) sem notarização Apple."
+            echo ""
+            echo "Conteúdo: Orca a partir do branch ecoup. Base upstream: versão ${UPSTREAM_VERSION}, commit ${GITHUB_SHA}."
+            echo ""
+            echo "## Instalação no macOS"
+            echo ""
+            echo "1. Baixe o orca-macos-arm64.dmg abaixo e arraste o Orca.app para Aplicativos."
+            echo "2. Na PRIMEIRA abertura: clique com o botão direito no Orca.app e escolha Abrir, depois confirme Abrir no diálogo."
+            echo "   O build usa assinatura ad-hoc, sem notarização; o Gatekeeper bloqueia o duplo clique simples."
+          } > "$RUNNER_TEMP/release-notes.md"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/orca-macos-*.dmg --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" dist/orca-macos-*.dmg \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Orca EcoUp ${TAG}" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
+              --verify-tag
+          fi
