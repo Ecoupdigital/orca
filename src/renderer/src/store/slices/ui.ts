@@ -6,7 +6,7 @@ import {
   findPrevLiveNonTaskStackHistoryIndex,
   findPrevLiveWorktreeHistoryIndex
 } from './worktree-nav-history'
-import { sanitizePaneExplorerByWorktree } from './pane-explorer'
+import { sanitizePaneExplorerByWorktree, type PaneExplorerEntry } from './pane-explorer'
 import type {
   ChangelogData,
   CustomPet,
@@ -2332,6 +2332,13 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       const manualRepoOrder = normalizeManualRepoOrder(ui.manualRepoOrder)
       const orderedRepos = applyManualRepoOrder(s.repos, manualRepoOrder)
       const validRepoIds = new Set(s.repos.map((repo) => repo.id))
+      // Why: filters paneExplorerByWorktree below — see that field's comment.
+      // `?? {}` mirrors the same partial-state tolerance as pruneWorkspaceSplitState
+      // / prunePaneExplorerState: some worktree-isolation test stores mock a
+      // minimal AppState without this slice.
+      const validWorktreeIds = new Set(
+        Object.values(s.worktreesByRepo ?? {}).flatMap((worktrees) => worktrees.map((w) => w.id))
+      )
       const persistedFilterRepoIds = sanitizePersistedRepoIds(ui.filterRepoIds)
       // Why: pre-rename builds used sidekick* keys; read as fallback only so new pet* writes win after upgrade.
       const customPets = Array.isArray(ui.customPets)
@@ -2423,12 +2430,31 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         hideDefaultBranchWorkspace: ui.hideDefaultBranchWorkspace ?? false,
         hideAutomationGeneratedWorkspaces: ui.hideAutomationGeneratedWorkspaces === true,
         showDotfilesByWorktree: sanitizeShowDotfilesByWorktree(ui.showDotfilesByWorktree),
-        // Why: startup hydrates UI before repo/worktree catalogs, mirroring the
-        // filterRepoIds deferral above — orphan entries for now-gone worktrees
-        // are not accumulated going forward because worktree removal purges
-        // this record (prunePaneExplorerState) and the debounced writer then
-        // persists the pruned state.
-        paneExplorerByWorktree: sanitizePaneExplorerByWorktree(ui.paneExplorerByWorktree),
+        // Why: startup hydrates UI before repo/worktree catalogs, so defer to
+        // the unfiltered sanitized set until worktreesByRepo is populated —
+        // same precedent as filterRepoIds below. Once worktrees ARE known
+        // (every 'sync' broadcast, since ui:stateChanged echoes to every
+        // window including the sender), filter out entries for worktrees
+        // that no longer exist. This closes a real race (caught by the
+        // EDGE-01 e2e): the 150ms debounced writer can capture a pane's
+        // explorer entry right before that worktree is removed; by the time
+        // its self-echo lands back here, worktreesByRepo already excludes
+        // the removed worktree (removeWorktree/buildWorktreePurgeState run
+        // synchronously), so this filter drops the stale entry instead of
+        // resurrecting it over the in-memory purge.
+        paneExplorerByWorktree: (() => {
+          const sanitized = sanitizePaneExplorerByWorktree(ui.paneExplorerByWorktree)
+          if (validWorktreeIds.size === 0) {
+            return sanitized
+          }
+          const next: Record<string, PaneExplorerEntry> = {}
+          for (const [worktreeId, entry] of Object.entries(sanitized)) {
+            if (validWorktreeIds.has(worktreeId)) {
+              next[worktreeId] = entry
+            }
+          }
+          return next
+        })(),
         // Why: startup hydrates UI before repo catalogs, so defer repo-filter validation to the all-host refresh.
         filterRepoIds:
           validRepoIds.size === 0

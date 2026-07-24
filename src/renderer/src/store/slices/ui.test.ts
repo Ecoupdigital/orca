@@ -907,6 +907,46 @@ describe('createUISlice hydratePersistedUI', () => {
     expect(store.getState().setupScriptPromptDismissedRepoIds).toEqual([localDismissalKey])
   })
 
+  it('preserves persisted pane explorer entries until worktrees are loaded', () => {
+    const store = createUIStore()
+
+    store.getState().hydratePersistedUI(
+      makePersistedUI({
+        paneExplorerByWorktree: { 'wt-remote': { expanded: true, width: 300 } }
+      })
+    )
+
+    expect(store.getState().paneExplorerByWorktree).toEqual({
+      'wt-remote': { expanded: true, width: 300 }
+    })
+  })
+
+  it('drops pane explorer entries for worktrees that no longer exist once worktrees are loaded (EDGE-01)', () => {
+    // Why: closes a real self-echo race caught by the pane-explorer e2e —
+    // ui:stateChanged broadcasts to every window including the sender, so a
+    // debounced write captured right before a worktree is removed can echo
+    // back after the in-memory purge. Filtering here (mirroring the
+    // filterRepoIds precedent above) drops the stale entry instead of
+    // resurrecting it.
+    const store = createUIStore()
+    store.setState({
+      worktreesByRepo: { repo1: [makeWorktree('wt-local')] }
+    } as Partial<AppState>)
+
+    store.getState().hydratePersistedUI(
+      makePersistedUI({
+        paneExplorerByWorktree: {
+          'wt-local': { expanded: true, width: 300 },
+          'wt-stale': { expanded: false, width: 200 }
+        }
+      })
+    )
+
+    expect(store.getState().paneExplorerByWorktree).toEqual({
+      'wt-local': { expanded: true, width: 300 }
+    })
+  })
+
   it('hydrates legacy persisted search tab as Explorer search', () => {
     const store = createUIStore()
 
