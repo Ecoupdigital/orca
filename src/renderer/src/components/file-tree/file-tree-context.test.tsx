@@ -14,7 +14,10 @@ const initialAppState = useAppStore.getInitialState()
 
 function withProvider(worktreeId: string) {
   return function Wrapper({ children }: { children: ReactNode }): React.JSX.Element {
-    const value = useMemo(() => ({ worktreeId }), [worktreeId])
+    // Why: worktreeId is a closure value from withProvider's outer scope, not
+    // a prop/state of Wrapper, so it is stable across re-renders and does not
+    // belong in the dependency array.
+    const value = useMemo(() => ({ worktreeId }), [])
     return (
       <FileTreeWorktreeContext.Provider value={value}>{children}</FileTreeWorktreeContext.Provider>
     )
