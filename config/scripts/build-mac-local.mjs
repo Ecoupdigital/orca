@@ -31,16 +31,28 @@ export function getLocalBuildIdentity() {
 if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
   const identity = getLocalBuildIdentity()
   console.log(`[build:mac] local update version ${identity.version}`)
-  execFileSync(
-    process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-    ['exec', 'electron-builder', '--config', 'config/electron-builder.config.cjs', '--mac'],
-    {
-      env: {
-        ...process.env,
-        ORCA_BUILD_COMMIT: identity.commit,
-        ORCA_LOCAL_BUILD_VERSION: identity.version
-      },
-      stdio: 'inherit'
-    }
+  // Why: pnpm build:mac --publish never lands here as argv; without forwarding,
+  // electron-builder falls back to GitHub publish and fails when GH_TOKEN is unset
+  // (EcoUp CI builds DMGs then uploads via gh release, not electron-builder publish).
+  const extraArgs = process.argv.slice(2)
+  const hasPublishFlag = extraArgs.some(
+    (arg) => arg === '--publish' || arg.startsWith('--publish=')
   )
+  const electronBuilderArgs = [
+    'exec',
+    'electron-builder',
+    '--config',
+    'config/electron-builder.config.cjs',
+    '--mac',
+    ...(hasPublishFlag ? [] : ['--publish', 'never']),
+    ...extraArgs
+  ]
+  execFileSync(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', electronBuilderArgs, {
+    env: {
+      ...process.env,
+      ORCA_BUILD_COMMIT: identity.commit,
+      ORCA_LOCAL_BUILD_VERSION: identity.version
+    },
+    stdio: 'inherit'
+  })
 }
