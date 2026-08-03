@@ -101,6 +101,47 @@ describe('ensureWorktreeHasInitialTerminal', () => {
     expect(store.queueTabSetupSplit).not.toHaveBeenCalled()
   })
 
+  it('does not seed an empty shell when runtime tabs exist but are not renderable', () => {
+    const store = createMockStore({
+      tabsByWorktree: { 'wt-1': [{ id: 'dead-tab' }] },
+      reconcileWorktreeTabModel: vi.fn(() => ({ renderableTabCount: 0 }))
+    })
+
+    const result = ensureWorktreeHasInitialTerminal(store, 'wt-1')
+
+    expect(result).toBeNull()
+    expect(store.createTab).not.toHaveBeenCalled()
+  })
+
+  it('does not reseed when groups/layout remain after the user emptied the surface', () => {
+    const store = createMockStore({
+      tabsByWorktree: { 'wt-1': [] },
+      groupsByWorktree: { 'wt-1': [{ id: 'g1' }] },
+      layoutByWorktree: { 'wt-1': { type: 'leaf', groupId: 'g1' } },
+      reconcileWorktreeTabModel: vi.fn(() => ({ renderableTabCount: 0 }))
+    })
+
+    expect(ensureWorktreeHasInitialTerminal(store, 'wt-1')).toBeNull()
+    expect(store.createTab).not.toHaveBeenCalled()
+  })
+
+  it('still seeds when setup intent needs a host and no runtime row exists', () => {
+    const store = createMockStore({
+      groupsByWorktree: { 'wt-1': [{ id: 'g1' }] },
+      layoutByWorktree: { 'wt-1': { type: 'leaf', groupId: 'g1' } }
+    })
+
+    ensureWorktreeHasInitialTerminal(store, 'wt-1', undefined, {
+      runnerScriptPath: '/tmp/repo/.git/orca/setup-runner.sh',
+      envVars: {
+        ORCA_ROOT_PATH: '/tmp/repo',
+        ORCA_WORKTREE_PATH: '/tmp/worktrees/wt-1'
+      }
+    })
+
+    expect(store.createTab).toHaveBeenCalled()
+  })
+
   it('creates configured default tabs once with title, color, and opted-in commands', () => {
     let createdIndex = 0
     const createTab = vi.fn(() => ({ id: `tab-${++createdIndex}` }))

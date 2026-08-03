@@ -15,7 +15,10 @@ import type {
   AgentProviderSessionMetadata,
   SleepingAgentLaunchConfig
 } from '../../../shared/agent-session-resume'
-import { shouldAutoCreateInitialTerminal } from '@/components/terminal/initial-terminal'
+import {
+  readInitialTerminalSurfaceSnapshot,
+  shouldAutoCreateInitialTerminal
+} from '@/components/terminal/initial-terminal'
 import { buildSetupRunnerCommand } from './setup-runner'
 import { createSequencedSetupAgentCommands } from '../../../shared/setup-agent-sequencing'
 import { getSetupRunnerCommandPlatformForPath } from '../../../shared/setup-runner-command'
@@ -96,6 +99,9 @@ export type IssueCommandLaunch =
 type WorktreeActivationStore = Partial<WorktreeRuntimeOwnerState> & {
   tabsByWorktree: Record<string, { id: string }[]>
   defaultTerminalTabsAppliedByWorktreeId: Record<string, true>
+  unifiedTabsByWorktree?: Record<string, { id: string }[]>
+  groupsByWorktree?: Record<string, { id: string }[]>
+  layoutByWorktree?: Record<string, unknown>
   createTab: (
     worktreeId: string,
     targetGroupId?: string,
@@ -464,6 +470,23 @@ export function ensureWorktreeHasInitialTerminal(
     wrappedSetupCommandStr = sequenced.setupCommand
   }
 
+  // Why: prefer the activation store's slices (tests pass partial mocks) and fall back to
+  // the live app store after reconcile so orphan cleanup is visible to the seed decision.
+  const appState = useAppStore.getState()
+  const surface = readInitialTerminalSurfaceSnapshot(
+    {
+      tabsByWorktree: store.tabsByWorktree ?? appState.tabsByWorktree,
+      unifiedTabsByWorktree: store.unifiedTabsByWorktree ?? appState.unifiedTabsByWorktree,
+      groupsByWorktree: store.groupsByWorktree ?? appState.groupsByWorktree,
+      layoutByWorktree: store.layoutByWorktree ?? appState.layoutByWorktree,
+      defaultTerminalTabsAppliedByWorktreeId:
+        store.defaultTerminalTabsAppliedByWorktreeId ??
+        appState.defaultTerminalTabsAppliedByWorktreeId
+    },
+    worktreeId
+  )
+  const forceIfEmpty = Boolean(sequencedStartup || setup || issueCommand || defaultTabs)
+
   // Why: web clients mirror the server's session tabs, so avoid spawning a duplicate host terminal before the mirror lands.
   if (isWebRuntimeSessionActive(getRuntimeEnvironmentIdForWorktree(ownerState, worktreeId))) {
     const existingTerminalTabId = store.tabsByWorktree[worktreeId]?.[0]?.id
@@ -498,7 +521,7 @@ export function ensureWorktreeHasInitialTerminal(
     return null
   }
 
-  if (!shouldAutoCreateInitialTerminal(renderableTabCount)) {
+  if (!shouldAutoCreateInitialTerminal(renderableTabCount, { surface, forceIfEmpty })) {
     const existingTerminalTabId = store.tabsByWorktree[worktreeId]?.[0]?.id
     if (existingTerminalTabId && (setup || issueCommand)) {
       // Why: main may have adopted the startup tab but failed to spawn setup; renderer must still launch the returned fallback setup.

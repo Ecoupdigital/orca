@@ -64,7 +64,10 @@ import {
   type WorkspacePaneFrame
 } from './workspace-split/workspace-split-frames'
 import { collectPaneIds, workspaceSplitContainsPane } from '../store/slices/workspace-split-view'
-import { shouldAutoCreateInitialTerminal } from './terminal/initial-terminal'
+import {
+  readInitialTerminalSurfaceSnapshot,
+  shouldAutoCreateInitialTerminal
+} from './terminal/initial-terminal'
 import { resolveRepairedActiveTerminalTabId } from './terminal/active-terminal-repair'
 import { scheduleBackgroundTerminalWorktreeMeasure } from './terminal/background-terminal-worktree-visibility'
 import {
@@ -1246,7 +1249,10 @@ function Terminal(): React.JSX.Element | null {
 
     // Why: give a newly activated worktree a focusable surface when nothing renders, without recreating one after the user closes the last visible tab.
     const { renderableTabCount } = reconcileWorktreeTabModel(activeWorktreeId)
-    if (!shouldAutoCreateInitialTerminal(renderableTabCount)) {
+    // Why: read footprint after reconcile so orphan cleanup is visible; prior groups/tabs/layout
+    // mean project switch or pane-focus (promotePaneFocusContext) must not mint an empty shell.
+    const surface = readInitialTerminalSurfaceSnapshot(useAppStore.getState(), activeWorktreeId)
+    if (!shouldAutoCreateInitialTerminal(renderableTabCount, { surface })) {
       return
     }
     // Why: tag this never-visited-worktree tab so its PTY spawn doesn't count as activity and reshuffle the sidebar (explicit New Tab still bumps).
