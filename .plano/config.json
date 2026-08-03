@@ -1,0 +1,7 @@
+{
+  "mode": "yolo",
+  "granularity": "standard",
+  "parallelization": true,
+  "commit_docs": false,
+  "github_native": false
+}

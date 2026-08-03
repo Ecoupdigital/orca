@@ -58,7 +58,9 @@ import { getWorkspaceStatus, getWorkspaceStatusVisualMeta } from './workspace-st
 import { WorktreeOpenInSubMenu } from './WorktreeOpenInMenu'
 import { ProjectGroupNameDialog } from './ProjectGroupNameDialog'
 import { WorktreeParentPickerPopover } from './WorktreeParentPickerPopover'
+import { WorktreeDeveloperMenu } from './WorktreeDeveloperMenu'
 import { getEligibleWorktreeParents } from './worktree-parent-candidates'
+import { WorkspaceSleepMenuItems } from './WorkspaceSleepMenuItems'
 import { isEventTargetInsideCurrentTarget } from './worktree-card-dom-events'
 import { translate } from '@/i18n/i18n'
 import {
@@ -66,6 +68,13 @@ import {
   parseWorkspaceKey,
   worktreeWorkspaceKey
 } from '../../../../shared/workspace-scope'
+
+export function shouldRevealWorktreeDeveloperMenu(args: {
+  developerMenuRevealed: boolean
+  isMultiContext: boolean
+}): boolean {
+  return args.developerMenuRevealed && !args.isMultiContext
+}
 
 type Props = {
   worktree: Worktree
@@ -1042,6 +1051,21 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                       )
                     : translate('auto.components.sidebar.WorktreeContextMenu.f4475537d8', 'Delete')}
           </DropdownMenuItem>
+          {shouldRevealWorktreeDeveloperMenu({ developerMenuRevealed, isMultiContext }) ? (
+            <>
+              <WorktreeDeveloperMenu worktreeId={worktree.id} disabled={isDeleting} />
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          <WorkspaceSleepMenuItems
+            isMultiContext={isMultiContext}
+            sleepLabel={sleepLabel}
+            sleepDisabled={deletingContext || sleepableWorktrees.length === 0}
+            descendantCount={lineageDescendantCount}
+            subtreeSleepDisabled={deletingSubtree || subtreeSleepableWorktrees.length === 0}
+            onSleep={handleCloseTerminals}
+            onSleepSubtree={handleSleepSubtree}
+          />
         </DropdownMenuContent>
       </DropdownMenu>
       <ProjectGroupNameDialog

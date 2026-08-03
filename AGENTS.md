@@ -5,7 +5,7 @@ All UI work — layout, color, typography, spacing, component selection, UX beha
 # Style
 ## Concise/Brief Non-obviosu comments ONLY
   * DO NOT: be verbose, explain the obvious, walk through the code ("WHY not HOW")
-  * DO: BE CONCISE. 1 LINE if possible
+  * BE CONCISE. 1 LINE if possible
 
 ## Lint Rules: Do Not Disable Max Lines
 
@@ -34,6 +34,10 @@ Orca targets macOS, Linux, and Windows. Keep all platform-dependent behavior beh
 ## SSH Use Case
 
 All changes must consider the SSH use case. Don't assume local-only execution.
+
+## Folder Workspace Use Case
+
+All changes must consider folder workspaces as well as git worktrees. Don't assume every workspace is a git worktree.
 
 ## Git Binary Compatibility
 

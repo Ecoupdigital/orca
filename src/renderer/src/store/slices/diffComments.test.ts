@@ -144,6 +144,7 @@ import { createPinnedTabCloseConfirmSlice } from './pinned-tab-close-confirm'
 import { createRecentlyClosedTabsSlice } from './recently-closed-tabs'
 import { createOrcaProfilesSlice } from './orca-profiles'
 import { createNewIssueDraftSlice } from './new-issue-draft'
+import { createTaskCreationDraftsSlice } from './task-creation-drafts'
 import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createWorkspaceSplitViewSlice } from './workspace-split-view'
 import { createPaneExplorerSlice } from './pane-explorer'
@@ -189,6 +190,7 @@ function createTestStore() {
     ...createRecentlyClosedTabsSlice(...a),
     ...createOrcaProfilesSlice(...a),
     ...createNewIssueDraftSlice(...a),
+    ...createTaskCreationDraftsSlice(...a),
     ...createRemoteServerUpdatesSlice(...a),
     ...createWorkspaceSplitViewSlice(...a),
     ...createPaneExplorerSlice(...a)

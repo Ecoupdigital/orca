@@ -103,7 +103,7 @@ export const getExperimentalPaneSearchEntries = createLocalizedCatalog(
       ),
       description: translate(
         'auto.components.settings.experimental.search.agentDashboard.description',
-        'Pop-out Kanban board for monitoring agents across worktrees.'
+        'Kanban board for monitoring agents across worktrees, in-window or as a pop-out.'
       ),
       keywords: [
         ...translateSearchKeyword(
@@ -125,6 +125,14 @@ export const getExperimentalPaneSearchEntries = createLocalizedCatalog(
         ...translateSearchKeyword(
           'auto.components.settings.experimental.search.agentDashboard.popout',
           'pop-out'
+        ),
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.agentDashboard.board',
+          'board'
+        ),
+        ...translateSearchKeyword(
+          'auto.components.settings.experimental.search.agentDashboard.inWindow',
+          'in-window'
         ),
         ...translateSearchKeyword(
           'auto.components.settings.experimental.search.agentDashboard.worktrees',
@@ -269,7 +277,7 @@ export function getExperimentalSearchEntry() {
       )
     ),
     ephemeralVms: findEntry(
-      translate('auto.components.settings.ephemeralVms.search.title', 'Per-Workspace Environments')
+      translate('auto.components.settings.ephemeralVms.search.cloudVmTitle', 'Cloud VM')
     ),
     sideBySideWorkspaces: findEntry(
       translate(
